@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><title>CALLBACK REACHED</title></head>
+<body>
+<h1>Intent callback reached!</h1>
+<p>Source: <span id="src"></span></p>
+<script>
+document.getElementById('src').textContent = location.search;
+document.title = 'CALLBACK_' + new URLSearchParams(location.search).get('from');
+</script>
+</body>
+</html>
