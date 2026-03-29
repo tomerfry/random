@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head><title>File Access Test</title></head>
+<body>
+<h2>Samsung Notes WebView - File Access Test</h2>
+<div id="results" style="font-family:monospace;white-space:pre;background:#eee;padding:10px;"></div>
+<script>
+var r = document.getElementById('results');
+function log(msg) { r.textContent += msg + '\n'; }
+
+log('=== Testing file:// access ===');
+log('User-Agent: ' + navigator.userAgent);
+log('Origin: ' + location.origin);
+log('');
+
+// Test 1: fetch file://
+log('[Test 1] fetch file:///sdcard/Download/test_secret.txt');
+fetch('file:///sdcard/Download/test_secret.txt')
+  .then(function(resp) { return resp.text(); })
+  .then(function(text) { log('  SUCCESS: ' + text); })
+  .catch(function(err) { log('  BLOCKED: ' + err); });
+
+// Test 2: XMLHttpRequest
+log('[Test 2] XMLHttpRequest file://');
+try {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'file:///sdcard/Download/test_secret.txt', true);
+  xhr.onload = function() { log('  SUCCESS: ' + xhr.responseText); };
+  xhr.onerror = function() { log('  BLOCKED: XHR error'); };
+  xhr.send();
+} catch(e) { log('  BLOCKED: ' + e); }
+
+// Test 3: content:// URI
+log('[Test 3] fetch content://media/external/images');
+fetch('content://media/external/images/media')
+  .then(function(resp) { return resp.text(); })
+  .then(function(text) { log('  SUCCESS: ' + text.substring(0,200)); })
+  .catch(function(err) { log('  BLOCKED: ' + err); });
+
+// Test 4: Check what APIs are available
+log('');
+log('[Test 4] Available APIs:');
+log('  navigator.contacts: ' + (typeof navigator.contacts));
+log('  navigator.geolocation: ' + (typeof navigator.geolocation));
+log('  caches: ' + (typeof caches));
+log('  indexedDB: ' + (typeof indexedDB));
+log('  Notification: ' + (typeof Notification));
+
+log('');
+log('=== Tests complete ===');
+</script>
+</body>
+</html>
